@@ -1,0 +1,1156 @@
+// =============================================================================
+// PRISMA SCHEMA - E-Commerce Website for Resin Art
+// =============================================================================
+// 
+// This file defines our database structure using Prisma Schema Language (PSL).
+// Prisma is a modern ORM (Object-Relational Mapping) that makes database 
+// interactions type-safe and developer-friendly.
+//
+// WHAT IS PRISMA?
+// ----------------
+// Prisma is a next-generation ORM that consists of:
+// 1. Prisma Client - Auto-generated query builder for Node.js & TypeScript
+// 2. Prisma Migrate - Declarative data modeling & migration system
+// 3. Prisma Studio - GUI to view and edit data in your database
+//
+// WHY PRISMA OVER RAW SQL?
+// ------------------------
+// 1. Type Safety - Catches errors at compile time, not runtime
+// 2. Auto-completion - IDE knows your database schema
+// 3. Migrations - Version control for your database schema
+// 4. Relations - Easy to define and query relationships
+// 5. Raw SQL Support - You can still write raw SQL when needed
+//
+// PRISMA VS MONGOOSE:
+// -------------------
+// - Mongoose: For MongoDB (NoSQL, document-based)
+// - Prisma: For SQL databases (MySQL, PostgreSQL, SQLite, SQL Server)
+// - Prisma can also work with MongoDB, but it shines with SQL databases
+//
+// =============================================================================
+
+// =============================================================================
+// GENERATOR CONFIGURATION
+// =============================================================================
+// The generator block tells Prisma what to generate from this schema.
+// "prisma-client-js" generates the Prisma Client for JavaScript/TypeScript.
+//
+// After changing this schema, run: npx prisma generate
+// This regenerates the client with the latest schema changes.
+
+generator client {
+  provider = "prisma-client-js"
+  // The provider specifies which client library to generate
+  // "prisma-client-js" is for JavaScript/TypeScript projects
+  
+  // Optional: You can specify where to output the generated client
+  // output   = "./generated/prisma-client"
+}
+
+// =============================================================================
+// DATASOURCE CONFIGURATION
+// =============================================================================
+// The datasource block configures how Prisma connects to your database.
+//
+// SUPPORTED DATABASES:
+// - mysql (MySQL, MariaDB)
+// - postgresql (PostgreSQL)
+// - sqlite (SQLite)
+// - sqlserver (Microsoft SQL Server)
+// - mongodb (MongoDB)
+// - cockroachdb (CockroachDB)
+
+datasource db {
+  provider = "mysql"
+  // We're using MySQL as specified in the project requirements
+  // The connection URL is loaded from environment variables for security
+  // Never hardcode database credentials in your schema!
+  url = env("DATABASE_URL")
+  // MySQL URL Format:
+  // mysql://USER:PASSWORD@HOST:PORT/DATABASE
+  // Example: mysql://root:password@localhost:3306/resin_art_db
+}
+
+// =============================================================================
+// ENUMS - Predefined Value Sets
+// =============================================================================
+// Enums define a fixed set of possible values for a field.
+// This ensures data integrity - only valid values can be stored.
+//
+// WHY USE ENUMS?
+// 1. Data Integrity - Prevents invalid values
+// 2. Type Safety - IDE autocomplete shows valid options
+// 3. Self-Documentation - Schema shows all possible values
+// 4. Performance - Stored efficiently in database
+
+// User roles in the system
+// Based on Section 6 - Primary Actors: User, Admin
+enum UserRole {
+  USER    // Regular customer who can browse and purchase products
+  ADMIN   // Administrator with full system access
+}
+
+// User account status
+enum UserStatus {
+  ACTIVE    // User can access all features
+  BLOCKED   // User is blocked by admin (Section 5.3.1)
+  INACTIVE  // User deactivated their account
+}
+
+// Order status - Based on Section 5.5 Order Management
+enum OrderStatus {
+  PENDING     // Order placed but not confirmed (5.5.3)
+  CONFIRMED   // Order confirmed by user/admin (5.5.1)
+  PROCESSING  // Order is being prepared (5.5.2)
+  SHIPPED     // Order handed to delivery
+  DELIVERED   // Order delivered to customer
+  CANCELLED   // Order cancelled (5.5.4)
+}
+
+// Payment status - Based on Section 5.6 Payment Management
+enum PaymentStatus {
+  PENDING     // Payment not completed (5.6.3)
+  COMPLETED   // Payment successful
+  FAILED      // Payment failed
+  REFUNDED    // Payment refunded after cancellation
+}
+
+// Payment methods - Based on SRS-58
+enum PaymentMethod {
+  CREDIT_CARD     // Credit card payment
+  DEBIT_CARD      // Debit card payment
+  EASYPAISA       // Mobile wallet (mentioned in SRS-58)
+  JAZZCASH        // Another mobile wallet option
+  BANK_TRANSFER   // Direct bank transfer
+  COD             // Cash on Delivery
+}
+
+// Delivery status - Based on Section 5.7 Delivery Management
+enum DeliveryStatus {
+  PENDING     // Delivery not started (5.7.2)
+  PROCESSING  // Being prepared for shipping (5.7.3)
+  SHIPPED     // Out for delivery
+  DELIVERED   // Successfully delivered (5.7.4)
+  RETURNED    // Returned to sender
+}
+
+// Product categories for Resin Art
+enum ProductCategory {
+  JEWELRY           // Resin jewelry (rings, pendants, earrings)
+  HOME_DECOR        // Home decoration items
+  COASTERS          // Resin coasters
+  KEYCHAINS         // Resin keychains
+  WALL_ART          // Wall art pieces
+  TRAYS             // Serving trays
+  BOOKMARKS         // Resin bookmarks
+  PHONE_CASES       // Custom phone cases
+  CLOCKS            // Resin clocks
+  CUSTOM            // Custom/personalized items (5.2.3)
+}
+
+// Expense categories - Based on Section 5.14 Expenditure Management
+enum ExpenseCategory {
+  RAW_MATERIALS     // Resin, pigments, molds, etc.
+  PACKAGING         // Boxes, bubble wrap, etc.
+  SHIPPING          // Shipping costs
+  MARKETING         // Advertising, promotions
+  UTILITIES         // Electricity, internet, etc.
+  EQUIPMENT         // Tools, machines
+  SALARIES          // Employee payments
+  RENT              // Shop/warehouse rent
+  MISCELLANEOUS     // Other expenses
+}
+
+// Notification types - Based on Section 5.12
+enum NotificationType {
+  SMS           // SMS notification (5.12.1)
+  PUSH          // Push notification (5.12.2)
+  EMAIL         // Email notification
+  IN_APP        // In-app notification
+}
+
+// =============================================================================
+// USER MODEL
+// =============================================================================
+// Based on Section 5.1 (Security Management) and 5.3 (User Management)
+// This model stores all user information including customers and admins.
+//
+// PRISMA MODEL SYNTAX:
+// model ModelName {
+//   fieldName FieldType Modifiers
+// }
+//
+// FIELD MODIFIERS:
+// - @id: Primary key
+// - @unique: Unique constraint
+// - @default(): Default value
+// - @map(): Map to different column name
+// - @relation(): Define relationships
+
+model User {
+  // ==========================================================================
+  // Primary Key
+  // ==========================================================================
+  // Every model needs a primary key. In Prisma, we use @id decorator.
+  // autoincrement() automatically generates sequential IDs (1, 2, 3, ...)
+  
+  id        Int      @id @default(autoincrement())
+  // Int = Integer type
+  // @id = This field is the primary key
+  // @default(autoincrement()) = Auto-generate incrementing values
+  
+  // ==========================================================================
+  // Core Fields - Based on SRS Requirements
+  // ==========================================================================
+  
+  // User's full name (SRS-1: personal details like name)
+  name      String   @db.VarChar(100)
+  // String = Text type
+  // @db.VarChar(100) = MySQL VARCHAR(100) - max 100 characters
+  
+  // Email address - must be unique (SRS-2: email is unique)
+  email     String   @unique @db.VarChar(100)
+  // @unique = No two users can have same email
+  
+  // Password - stored as hashed value, never plain text!
+  // (Based on Section 3.1 Security: passwords saved in encrypted format)
+  password  String   @db.VarChar(255)
+  // 255 chars to accommodate bcrypt hashes (60 chars) with room for future algorithms
+  
+  // Phone number (SRS-1: mobile number)
+  phone     String?  @db.VarChar(15)
+  // String? = Optional field (can be null)
+  // VarChar(15) = Enough for international numbers with country code
+  
+  // User's address (SRS-35: profile containing address)
+  address   String?  @db.VarChar(255)
+  
+  // Date of birth (SRS-1: dob)
+  dateOfBirth DateTime? @map("date_of_birth")
+  // DateTime? = Optional date field
+  // @map("date_of_birth") = Column name in MySQL will be "date_of_birth" (snake_case)
+  
+  // User role - USER or ADMIN (Section 6: Primary Actors)
+  role      UserRole @default(USER)
+  // Default to USER, admin accounts are created manually or by other admins
+  
+  // Account status - for blocking/unblocking (Section 5.3.1, 5.3.2)
+  status    UserStatus @default(ACTIVE)
+  // New users are ACTIVE by default
+  
+  // Profile image URL (optional)
+  profileImage String? @map("profile_image") @db.VarChar(255)
+  
+  // ==========================================================================
+  // Password Reset Fields - Based on Section 5.1.4 Forget Password
+  // ==========================================================================
+  // These fields handle the password reset flow (SRS-10, 11, 12)
+  
+  // Token sent via email for password reset
+  resetPasswordToken  String?  @map("reset_password_token") @db.VarChar(255)
+  
+  // When the reset token expires (SRS-11 mentions time-limited tokens)
+  resetPasswordExpire DateTime? @map("reset_password_expire")
+  
+  // ==========================================================================
+  // Timestamps
+  // ==========================================================================
+  // Track when records are created and updated - best practice for all models
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  // @default(now()) = Automatically set to current timestamp on creation
+  
+  updatedAt DateTime @updatedAt @map("updated_at")
+  // @updatedAt = Automatically updated whenever the record is modified
+  
+  // ==========================================================================
+  // Relations - Connections to Other Models
+  // ==========================================================================
+  // Prisma uses relation fields to define how models connect.
+  // These don't create columns in the database - they're virtual fields
+  // that Prisma uses to build JOIN queries.
+  
+  // Products created by this admin (One-to-Many)
+  // One admin can create many products
+  products  Product[]
+  
+  // User's shopping cart (One-to-Many)
+  carts     Cart[]
+  
+  // Orders placed by this user (One-to-Many)
+  orders    Order[]
+  
+  // Payments made by this user
+  payments  Payment[]
+  
+  // Reviews written by this user
+  reviews   Review[]
+  
+  // Notifications for this user
+  notifications Notification[]
+  
+  // Admin-specific relations (when user is ADMIN)
+  profits       Profit[]      // Profit records created by admin
+  expenses      Expense[]     // Expenses recorded by admin
+  
+  // ==========================================================================
+  // Model Configuration
+  // ==========================================================================
+  // @@map specifies the actual table name in MySQL
+  // By convention, we use snake_case for table names
+  
+  @@map("users")
+  // The model is "User" in Prisma, but "users" table in MySQL
+  
+  // Create an index on email for faster lookups
+  @@index([email])
+  
+  // Create an index on role for filtering users by type
+  @@index([role])
+}
+
+// =============================================================================
+// PRODUCT MODEL
+// =============================================================================
+// Based on Section 5.2 (Product Management)
+// Stores all resin art products available in the store.
+
+model Product {
+  // Primary key
+  id          Int      @id @default(autoincrement())
+  
+  // ==========================================================================
+  // Product Details - Based on SRS-13 (product name, description, price, etc.)
+  // ==========================================================================
+  
+  // Product name (SRS-13)
+  name        String   @db.VarChar(150)
+  
+  // Detailed description of the product
+  description String   @db.Text
+  // @db.Text = MySQL TEXT type for longer content (up to 65,535 characters)
+  
+  // Product price (SRS-13)
+  price       Decimal  @db.Decimal(10, 2)
+  // Decimal = Exact numeric type for money (no floating point errors!)
+  // @db.Decimal(10, 2) = 10 digits total, 2 after decimal point
+  // Example: 99999999.99 (max value)
+  
+  // Discounted price (optional - for sales)
+  discountPrice Decimal? @map("discount_price") @db.Decimal(10, 2)
+  
+  // Category (enum defined above)
+  category    ProductCategory
+  
+  // Brand/Artist name
+  brand       String?  @db.VarChar(100)
+  
+  // Stock quantity (Section 5.9 Stock Management)
+  stock       Int      @default(0)
+  // How many units are available
+  
+  // Product images - stored as JSON array of URLs
+  // Prisma supports Json type for flexible data structures
+  images      Json?
+  // Example: ["url1.jpg", "url2.jpg", "url3.jpg"]
+  
+  // 3D Model URL for 360-degree view (Section 5.11)
+  model3dUrl  String?  @map("model_3d_url") @db.VarChar(255)
+  
+  // Tags for search and filtering (stored as JSON array)
+  tags        Json?
+  // Example: ["handmade", "blue", "ocean theme", "gift"]
+  
+  // Custom specifications (flexible JSON for product-specific details)
+  specifications Json?
+  // Example: {"dimensions": "10x10cm", "weight": "200g", "resinType": "epoxy"}
+  
+  // ==========================================================================
+  // Product Status
+  // ==========================================================================
+  
+  // Is this product available for purchase?
+  isActive    Boolean  @default(true) @map("is_active")
+  // Soft delete: instead of deleting, we set isActive = false
+  
+  // Is this a featured product? (for homepage display)
+  isFeatured  Boolean  @default(false) @map("is_featured")
+  
+  // Is this a customizable product? (Section 5.2.3)
+  isCustomizable Boolean @default(false) @map("is_customizable")
+  
+  // Average rating (calculated from reviews - Section 5.10)
+  averageRating Decimal? @default(0) @map("average_rating") @db.Decimal(3, 2)
+  // 3 digits, 2 decimal places: 5.00 max
+  
+  // Total number of reviews
+  totalReviews Int @default(0) @map("total_reviews")
+  
+  // ==========================================================================
+  // Foreign Keys - Relationships to Other Models
+  // ==========================================================================
+  
+  // Which admin created this product?
+  createdById Int      @map("created_by_id")
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  // @relation defines the foreign key relationship
+  // fields: [createdById] = The foreign key field in THIS model
+  // references: [id] = The primary key field in the RELATED model (User)
+  
+  // ==========================================================================
+  // Timestamps
+  // ==========================================================================
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // ==========================================================================
+  // Relations
+  // ==========================================================================
+  // Products appear in many carts (via CartItem)
+  cartItems   CartItem[]
+  
+  // Products appear in many orders (via OrderItem)
+  orderItems  OrderItem[]
+  
+  // Products have many reviews
+  reviews     Review[]
+  
+  // ==========================================================================
+  // Model Configuration
+  // ==========================================================================
+  @@map("products")
+  
+  // Indexes for common queries
+  @@index([category])              // Filter by category
+  @@index([price])                 // Sort/filter by price
+  @@index([isActive, isFeatured])  // Homepage featured products query
+  @@index([name])                  // Search by name
+  
+  // Full-text search index would need MySQL FULLTEXT - handled in raw SQL
+}
+
+// =============================================================================
+// CART MODEL
+// =============================================================================
+// Based on Section 5.4 (Cart Management)
+// Shopping cart for users to collect products before checkout.
+//
+// DESIGN DECISION:
+// We separate Cart (the container) from CartItem (items in cart).
+// This is the standard e-commerce pattern for flexibility.
+
+model Cart {
+  id        Int      @id @default(autoincrement())
+  
+  // Which user owns this cart?
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // onDelete: Cascade = If user is deleted, their cart is also deleted
+  
+  // Is this cart active? (user might have multiple historical carts)
+  isActive  Boolean  @default(true) @map("is_active")
+  
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Cart contains many items
+  items     CartItem[]
+  
+  @@map("carts")
+  
+  // A user can only have one active cart at a time
+  @@unique([userId, isActive])
+  @@index([userId])
+}
+
+// =============================================================================
+// CART ITEM MODEL
+// =============================================================================
+// Items within a shopping cart (Section 5.4)
+// This is the junction table between Cart and Product.
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  
+  // Which cart does this item belong to?
+  cartId    Int      @map("cart_id")
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  
+  // Which product is this?
+  productId Int      @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  // How many of this product? (SRS-45: quantity)
+  quantity  Int      @default(1)
+  
+  // Customization options (Section 5.2.3 - Customize Product)
+  // Stored as JSON for flexibility
+  customization Json?
+  // Example: {"color": "blue", "text": "Happy Birthday", "size": "large"}
+  
+  // Price at time of adding (prices might change later)
+  priceAtTime Decimal @map("price_at_time") @db.Decimal(10, 2)
+  
+  // Timestamps
+  addedAt   DateTime @default(now()) @map("added_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("cart_items")
+  
+  // Each product can only appear once per cart (update quantity instead)
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+// =============================================================================
+// ORDER MODEL
+// =============================================================================
+// Based on Section 5.5 (Order Management)
+// Represents a completed purchase order.
+
+model Order {
+  id              Int         @id @default(autoincrement())
+  
+  // Order number (human-readable unique identifier)
+  orderNumber     String      @unique @map("order_number") @db.VarChar(50)
+  // Example: "RA-2024-000001" (RA = Resin Art)
+  
+  // Which user placed this order?
+  userId          Int         @map("user_id")
+  user            User        @relation(fields: [userId], references: [id])
+  
+  // Order status (Section 5.5: Pending, Confirmed, Processing, etc.)
+  status          OrderStatus @default(PENDING)
+  
+  // ==========================================================================
+  // Price Breakdown
+  // ==========================================================================
+  
+  // Total of all items before discounts
+  subtotal        Decimal     @db.Decimal(10, 2)
+  
+  // Discount amount applied
+  discountAmount  Decimal     @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  
+  // Shipping cost
+  shippingCost    Decimal     @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  
+  // Tax amount
+  taxAmount       Decimal     @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  
+  // Final total (subtotal - discount + shipping + tax)
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(10, 2)
+  
+  // ==========================================================================
+  // Shipping Information
+  // ==========================================================================
+  
+  // Shipping address
+  shippingAddress String      @map("shipping_address") @db.Text
+  
+  // Contact phone for delivery
+  shippingPhone   String      @map("shipping_phone") @db.VarChar(15)
+  
+  // Special instructions for delivery
+  notes           String?     @db.Text
+  
+  // ==========================================================================
+  // Timestamps
+  // ==========================================================================
+  
+  // When order was placed
+  orderedAt       DateTime    @default(now()) @map("ordered_at")
+  
+  // When order was confirmed (SRS-49)
+  confirmedAt     DateTime?   @map("confirmed_at")
+  
+  // When order was shipped
+  shippedAt       DateTime?   @map("shipped_at")
+  
+  // When order was delivered
+  deliveredAt     DateTime?   @map("delivered_at")
+  
+  // When order was cancelled (if applicable)
+  cancelledAt     DateTime?   @map("cancelled_at")
+  
+  // Reason for cancellation (SRS-57)
+  cancelReason    String?     @map("cancel_reason") @db.VarChar(255)
+  
+  // General timestamps
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  
+  // ==========================================================================
+  // Relations
+  // ==========================================================================
+  
+  // Items in this order
+  items           OrderItem[]
+  
+  // Payment for this order
+  payment         Payment?
+  
+  // Delivery information
+  delivery        Delivery?
+  
+  // Order tracking history
+  trackingHistory OrderTracking[]
+  
+  @@map("orders")
+  
+  @@index([userId])
+  @@index([status])
+  @@index([orderedAt])
+  @@index([orderNumber])
+}
+
+// =============================================================================
+// ORDER ITEM MODEL
+// =============================================================================
+// Individual items within an order.
+// Snapshot of product details at time of purchase.
+
+model OrderItem {
+  id            Int      @id @default(autoincrement())
+  
+  // Which order does this belong to?
+  orderId       Int      @map("order_id")
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Which product was ordered?
+  productId     Int      @map("product_id")
+  product       Product  @relation(fields: [productId], references: [id])
+  
+  // Quantity ordered
+  quantity      Int
+  
+  // ==========================================================================
+  // Price Snapshot
+  // ==========================================================================
+  // We store the price at time of order because prices can change!
+  
+  // Unit price when ordered
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2)
+  
+  // Total for this item (quantity × unitPrice)
+  totalPrice    Decimal  @map("total_price") @db.Decimal(10, 2)
+  
+  // ==========================================================================
+  // Product Snapshot
+  // ==========================================================================
+  // Store product details in case product is modified/deleted later
+  
+  // Product name at time of order
+  productName   String   @map("product_name") @db.VarChar(150)
+  
+  // Product image URL
+  productImage  String?  @map("product_image") @db.VarChar(255)
+  
+  // Customization options (if any)
+  customization Json?
+  
+  @@map("order_items")
+  
+  @@index([orderId])
+  @@index([productId])
+}
+
+// =============================================================================
+// PAYMENT MODEL
+// =============================================================================
+// Based on Section 5.6 (Payment Management)
+// Handles payment transactions for orders.
+
+model Payment {
+  id              Int           @id @default(autoincrement())
+  
+  // Which order is this payment for?
+  orderId         Int           @unique @map("order_id")
+  order           Order         @relation(fields: [orderId], references: [id])
+  // @unique = One-to-one relationship (one payment per order)
+  
+  // Which user made this payment?
+  userId          Int           @map("user_id")
+  user            User          @relation(fields: [userId], references: [id])
+  
+  // Payment method used (SRS-58, 59)
+  method          PaymentMethod
+  
+  // Payment status (SRS-60, 61, 62)
+  status          PaymentStatus @default(PENDING)
+  
+  // Amount paid
+  amount          Decimal       @db.Decimal(10, 2)
+  
+  // Transaction ID from payment gateway
+  transactionId   String?       @unique @map("transaction_id") @db.VarChar(100)
+  
+  // Payment gateway response (stored as JSON for flexibility)
+  gatewayResponse Json?         @map("gateway_response")
+  
+  // When payment was made (SRS-60: payment date)
+  paidAt          DateTime?     @map("paid_at")
+  
+  // When payment failed (if applicable)
+  failedAt        DateTime?     @map("failed_at")
+  
+  // Failure reason
+  failureReason   String?       @map("failure_reason") @db.VarChar(255)
+  
+  // Timestamps
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  
+  @@map("payments")
+  
+  @@index([userId])
+  @@index([status])
+  @@index([transactionId])
+}
+
+// =============================================================================
+// DELIVERY MODEL
+// =============================================================================
+// Based on Section 5.7 (Delivery Management)
+// Tracks delivery/shipping information for orders.
+
+model Delivery {
+  id              Int            @id @default(autoincrement())
+  
+  // Which order is this delivery for?
+  orderId         Int            @unique @map("order_id")
+  order           Order          @relation(fields: [orderId], references: [id])
+  
+  // Delivery status (Section 5.7: Pending, Processing, Complete)
+  status          DeliveryStatus @default(PENDING)
+  
+  // ==========================================================================
+  // Shipping Provider Details (Section 5.8.4)
+  // ==========================================================================
+  
+  // Courier company name (SRS-78)
+  courierCompany  String?        @map("courier_company") @db.VarChar(100)
+  
+  // Courier contact number (SRS-79)
+  courierContact  String?        @map("courier_contact") @db.VarChar(15)
+  
+  // Tracking number from courier
+  trackingNumber  String?        @unique @map("tracking_number") @db.VarChar(100)
+  
+  // Tracking URL (external link to courier's tracking page)
+  trackingUrl     String?        @map("tracking_url") @db.VarChar(255)
+  
+  // ==========================================================================
+  // Delivery Address
+  // ==========================================================================
+  
+  // Full delivery address
+  address         String         @db.Text
+  
+  // City
+  city            String         @db.VarChar(100)
+  
+  // State/Province
+  state           String?        @db.VarChar(100)
+  
+  // Postal/ZIP code
+  postalCode      String?        @map("postal_code") @db.VarChar(20)
+  
+  // Country
+  country         String         @default("Pakistan") @db.VarChar(100)
+  
+  // GPS coordinates for real-time tracking (Section 5.8.3)
+  latitude        Decimal?       @db.Decimal(10, 8)
+  longitude       Decimal?       @db.Decimal(11, 8)
+  // Decimal precision for GPS: lat (-90 to 90), lng (-180 to 180)
+  
+  // ==========================================================================
+  // Delivery Timeline
+  // ==========================================================================
+  
+  // Estimated delivery date
+  estimatedDelivery DateTime?    @map("estimated_delivery")
+  
+  // Actual delivery date
+  actualDelivery    DateTime?    @map("actual_delivery")
+  
+  // When package was picked up by courier
+  pickedUpAt      DateTime?      @map("picked_up_at")
+  
+  // Delivery notes
+  notes           String?        @db.Text
+  
+  // Timestamps
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  
+  @@map("deliveries")
+  
+  @@index([status])
+  @@index([trackingNumber])
+}
+
+// =============================================================================
+// ORDER TRACKING MODEL
+// =============================================================================
+// Based on Section 5.8 (Order Tracking Management)
+// Stores history of order status changes for real-time tracking.
+
+model OrderTracking {
+  id          Int         @id @default(autoincrement())
+  
+  // Which order is this tracking for?
+  orderId     Int         @map("order_id")
+  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // Status at this point in time (SRS-72, 73)
+  status      String      @db.VarChar(50)
+  // Using String instead of enum for flexibility in custom statuses
+  // Examples: "Order Placed", "Payment Confirmed", "Packed", "Out for Delivery"
+  
+  // Description of what happened
+  description String?     @db.Text
+  
+  // Location where this update occurred
+  location    String?     @db.VarChar(255)
+  
+  // When this update happened (SRS-75)
+  timestamp   DateTime    @default(now())
+  
+  // Who made this update (admin user ID)
+  updatedBy   Int?        @map("updated_by")
+  
+  @@map("order_tracking")
+  
+  @@index([orderId])
+  @@index([timestamp])
+}
+
+// =============================================================================
+// REVIEW MODEL
+// =============================================================================
+// Based on Section 5.10 (Review Management)
+// Customer reviews and ratings for products.
+
+model Review {
+  id          Int      @id @default(autoincrement())
+  
+  // Which user wrote this review? (SRS-90: only purchasers can review)
+  userId      Int      @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  
+  // Which product is being reviewed?
+  productId   Int      @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  // Rating (1-5 stars) (SRS-93, 94)
+  rating      Int
+  // Will validate in application logic: 1 <= rating <= 5
+  
+  // Review comment/feedback (SRS-88, 89)
+  comment     String?  @db.Text
+  
+  // Is this review approved/visible?
+  isApproved  Boolean  @default(true) @map("is_approved")
+  // Admin might need to moderate reviews
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  @@map("reviews")
+  
+  // A user can only review a product once
+  @@unique([userId, productId])
+  
+  @@index([productId])
+  @@index([rating])
+}
+
+// =============================================================================
+// NOTIFICATION MODEL
+// =============================================================================
+// Based on Section 5.12 (Notification & Communication Management)
+// Stores notifications sent to users.
+
+model Notification {
+  id          Int              @id @default(autoincrement())
+  
+  // Which user is this notification for?
+  userId      Int              @map("user_id")
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Notification type (SMS, Push, Email, In-App)
+  type        NotificationType
+  
+  // Notification title
+  title       String           @db.VarChar(200)
+  
+  // Notification message/body
+  message     String           @db.Text
+  
+  // Has user read this notification?
+  isRead      Boolean          @default(false) @map("is_read")
+  
+  // Related entity (optional - for deep linking)
+  // Example: {"type": "order", "id": 123}
+  relatedTo   Json?            @map("related_to")
+  
+  // When notification was sent
+  sentAt      DateTime         @default(now()) @map("sent_at")
+  
+  // When notification was read
+  readAt      DateTime?        @map("read_at")
+  
+  @@map("notifications")
+  
+  @@index([userId])
+  @@index([isRead])
+  @@index([sentAt])
+}
+
+// =============================================================================
+// PROFIT MODEL
+// =============================================================================
+// Based on Section 5.13 (Profit Management)
+// Tracks daily/monthly profit records for admin reporting.
+
+model Profit {
+  id            Int      @id @default(autoincrement())
+  
+  // Which admin recorded this?
+  adminId       Int      @map("admin_id")
+  admin         User     @relation(fields: [adminId], references: [id])
+  
+  // Date of this profit record
+  date          DateTime @db.Date
+  // @db.Date = MySQL DATE type (no time component)
+  
+  // ==========================================================================
+  // Financial Data (SRS-113: Profit = Total Income - Total Expenses)
+  // ==========================================================================
+  
+  // Total income for this period
+  totalIncome   Decimal  @map("total_income") @db.Decimal(12, 2)
+  // 12 digits for larger amounts
+  
+  // Total expenses for this period
+  totalExpenses Decimal  @map("total_expenses") @db.Decimal(12, 2)
+  
+  // Net profit (calculated: totalIncome - totalExpenses)
+  netProfit     Decimal  @map("net_profit") @db.Decimal(12, 2)
+  
+  // Number of orders in this period
+  orderCount    Int      @default(0) @map("order_count")
+  
+  // Notes/comments
+  notes         String?  @db.Text
+  
+  // Timestamps
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@map("profits")
+  
+  // Only one profit record per date
+  @@unique([date])
+  
+  @@index([date])
+  @@index([adminId])
+}
+
+// =============================================================================
+// EXPENSE MODEL
+// =============================================================================
+// Based on Section 5.14 (Expenditure Management)
+// Tracks business expenses.
+
+model Expense {
+  id          Int             @id @default(autoincrement())
+  
+  // Which admin recorded this expense?
+  adminId     Int             @map("admin_id")
+  admin       User            @relation(fields: [adminId], references: [id])
+  
+  // Expense category (SRS-119: sort by category)
+  category    ExpenseCategory
+  
+  // Expense amount (SRS-117)
+  amount      Decimal         @db.Decimal(10, 2)
+  
+  // Description of the expense (SRS-117)
+  description String          @db.Text
+  
+  // Date of expense (SRS-117)
+  date        DateTime        @db.Date
+  
+  // Receipt/invoice image URL (optional)
+  receiptUrl  String?         @map("receipt_url") @db.VarChar(255)
+  
+  // Is this a recurring expense?
+  isRecurring Boolean         @default(false) @map("is_recurring")
+  
+  // Timestamps
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  
+  @@map("expenses")
+  
+  @@index([category])
+  @@index([date])
+  @@index([adminId])
+}
+
+// =============================================================================
+// BUDGET MODEL
+// =============================================================================
+// Based on Section 5.14.5 (Set Budget Limits)
+// Stores budget limits for expense tracking.
+
+model Budget {
+  id          Int             @id @default(autoincrement())
+  
+  // Budget category (matches expense categories)
+  category    ExpenseCategory
+  
+  // Budget amount limit (SRS-127)
+  limitAmount Decimal         @map("limit_amount") @db.Decimal(10, 2)
+  
+  // Time period for this budget
+  month       Int             // 1-12
+  year        Int             // e.g., 2024
+  
+  // Alert thresholds (SRS-128: alerts at 80%, 90%, 100%)
+  // These are stored as percentages
+  alertAt80   Boolean         @default(true) @map("alert_at_80")
+  alertAt90   Boolean         @default(true) @map("alert_at_90")
+  alertAt100  Boolean         @default(true) @map("alert_at_100")
+  
+  // Has alert been sent for each threshold?
+  alertSent80  Boolean        @default(false) @map("alert_sent_80")
+  alertSent90  Boolean        @default(false) @map("alert_sent_90")
+  alertSent100 Boolean        @default(false) @map("alert_sent_100")
+  
+  // Timestamps
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  
+  @@map("budgets")
+  
+  // One budget per category per month
+  @@unique([category, month, year])
+  
+  @@index([month, year])
+}
+
+// =============================================================================
+// USER PREFERENCES MODEL
+// =============================================================================
+// Based on Section 5.12 (user notification preferences)
+// Stores user preferences for notifications and settings.
+
+model UserPreference {
+  id              Int     @id @default(autoincrement())
+  
+  // Which user do these preferences belong to?
+  userId          Int     @unique @map("user_id")
+  
+  // ==========================================================================
+  // Notification Preferences (SRS-104, 107)
+  // ==========================================================================
+  
+  // SMS notifications (SRS-104: users can choose)
+  smsNotifications Boolean @default(true) @map("sms_notifications")
+  
+  // Push notifications (SRS-107: can turn on/off)
+  pushNotifications Boolean @default(true) @map("push_notifications")
+  
+  // Email notifications
+  emailNotifications Boolean @default(true) @map("email_notifications")
+  
+  // Order update notifications
+  orderUpdates    Boolean @default(true) @map("order_updates")
+  
+  // Promotional notifications
+  promotions      Boolean @default(true)
+  
+  // ==========================================================================
+  // Other Preferences
+  // ==========================================================================
+  
+  // Preferred language
+  language        String  @default("en") @db.VarChar(10)
+  
+  // Preferred currency
+  currency        String  @default("PKR") @db.VarChar(10)
+  
+  // Timestamps
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@map("user_preferences")
+}
+
+// =============================================================================
+// CHAT MESSAGE MODEL
+// =============================================================================
+// Based on Section 5.12.3 (Live Chat)
+// Stores chat messages between customers and support.
+
+model ChatMessage {
+  id          Int      @id @default(autoincrement())
+  
+  // Chat room/conversation ID
+  roomId      String   @map("room_id") @db.VarChar(100)
+  // Example: "user_123_admin_1" or "support_ticket_456"
+  
+  // Who sent this message?
+  senderId    Int      @map("sender_id")
+  
+  // Who is the recipient?
+  receiverId  Int      @map("receiver_id")
+  
+  // Message content (SRS-108: real-time messaging)
+  message     String   @db.Text
+  
+  // Message type (text, image, file)
+  messageType String   @default("text") @map("message_type") @db.VarChar(20)
+  
+  // File URL if message contains attachment (SRS-110: file sharing)
+  fileUrl     String?  @map("file_url") @db.VarChar(255)
+  
+  // Is message read by recipient?
+  isRead      Boolean  @default(false) @map("is_read")
+  
+  // Timestamp (SRS-109: chat history storage)
+  sentAt      DateTime @default(now()) @map("sent_at")
+  
+  @@map("chat_messages")
+  
+  @@index([roomId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([sentAt])
+}
+
+// =============================================================================
+// END OF SCHEMA
+// =============================================================================
+//
+// NEXT STEPS:
+// 1. Configure your .env file with DATABASE_URL
+// 2. Run: npx prisma generate (generates Prisma Client)
+// 3. Run: npx prisma db push (creates tables in database)
+// 4. Run: npx prisma studio (visual database browser)
+//
+// COMMON PRISMA COMMANDS:
+// - npx prisma generate    → Generate/update Prisma Client
+// - npx prisma db push     → Push schema to database (dev)
+// - npx prisma migrate dev → Create and apply migrations (production)
+// - npx prisma studio      → Open visual database editor
+// - npx prisma db seed     → Run seed script
+// - npx prisma format      → Format this schema file
+//
+// =============================================================================

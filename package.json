@@ -1,0 +1,44 @@
+{
+  "name": "resin-art-backend",
+  "version": "1.0.0",
+  "description": "E-Commerce Backend for Resin Art - Educational Tutorial using Node.js, Express, MySQL & Prisma",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js",
+    "setup": "npm run prisma:generate && npm run prisma:push && npm run prisma:seed"
+  },
+  "keywords": [
+    "ecommerce",
+    "resin-art",
+    "nodejs",
+    "express",
+    "mysql",
+    "prisma",
+    "jwt",
+    "authentication",
+    "tutorial"
+  ],
+  "author": "Educational Tutorial",
+  "license": "MIT",
+  "dependencies": {
+    "@prisma/client": "^5.7.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
+    "nodemailer": "^6.9.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "prisma": "^5.22.0"
+  }
+}
