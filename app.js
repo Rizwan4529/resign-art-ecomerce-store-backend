@@ -43,6 +43,8 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const stockRoutes = require('./routes/stockRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const salesReportRoutes = require('./routes/salesReportRoutes');
 
 // -----------------------------------------------------------------------------
 // IMPORT MIDDLEWARE
@@ -232,7 +234,9 @@ app.get('/api', (req, res) => {
       payments: '/api/payments',
       reviews: '/api/reviews',
       stock: '/api/stock',
+      inventory: '/api/inventory',
       reports: '/api/reports',
+      salesReports: '/api/reports/sales',
       notifications: '/api/notifications',
     },
   });
@@ -271,8 +275,14 @@ app.use('/api/reviews', reviewRoutes);
 // Section 5.9: Stock Management
 app.use('/api/stock', stockRoutes);
 
+// Section 5.9: Inventory Management (with history tracking)
+app.use('/api/inventory', inventoryRoutes);
+
 // Section 5.13 & 5.14: Profit & Expense Reports
 app.use('/api/reports', reportRoutes);
+
+// Sales Reports (PDF generation)
+app.use('/api/reports/sales', salesReportRoutes);
 
 // Section 5.12: Notifications
 app.use('/api/notifications', notificationRoutes);

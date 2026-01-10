@@ -292,7 +292,8 @@ model User {
   // Admin-specific relations (when user is ADMIN)
   profits       Profit[]      // Profit records created by admin
   expenses      Expense[]     // Expenses recorded by admin
-  
+  inventoryLogs InventoryLog[] // Inventory changes made by admin
+
   // ==========================================================================
   // Model Configuration
   // ==========================================================================
@@ -414,19 +415,95 @@ model Product {
   
   // Products have many reviews
   reviews     Review[]
-  
+
+  // Inventory change history
+  inventoryLogs InventoryLog[]
+
   // ==========================================================================
   // Model Configuration
   // ==========================================================================
   @@map("products")
-  
+
   // Indexes for common queries
   @@index([category])              // Filter by category
   @@index([price])                 // Sort/filter by price
   @@index([isActive, isFeatured])  // Homepage featured products query
   @@index([name])                  // Search by name
-  
+
   // Full-text search index would need MySQL FULLTEXT - handled in raw SQL
+}
+
+// =============================================================================
+// INVENTORY LOG MODEL
+// =============================================================================
+// Tracks all stock changes for audit trail and history
+// Supports manual adjustments, sales, restocks, and order cancellations
+// This model provides complete traceability of inventory movements
+
+model InventoryLog {
+  // Primary key
+  id          Int      @id @default(autoincrement())
+
+  // ==========================================================================
+  // Product Reference
+  // ==========================================================================
+  // Which product's stock changed?
+  productId   Int      @map("product_id")
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // onDelete: Cascade = If product is deleted, its inventory logs are also deleted
+
+  // ==========================================================================
+  // Stock Change Details
+  // ==========================================================================
+
+  // Previous stock level before the change
+  previousStock Int    @map("previous_stock")
+
+  // New stock level after the change
+  newStock      Int    @map("new_stock")
+
+  // Amount of change (can be positive for restocks or negative for sales/adjustments)
+  changeAmount  Int    @map("change_amount")
+  // Example: +50 for restock, -10 for sale
+
+  // ==========================================================================
+  // Change Classification
+  // ==========================================================================
+
+  // Type of change: MANUAL_ADJUSTMENT, SALE, RESTOCK, ORDER_CANCELLED
+  changeType    String @db.VarChar(50) @map("change_type")
+
+  // Reason or notes for the change (especially important for manual adjustments)
+  reason        String? @db.Text
+  // Example: "Damaged items removed", "New shipment received", "Inventory count correction"
+
+  // Reference to related entity if applicable
+  // Stored as JSON for flexibility
+  reference     Json?
+  // Example: {"type": "order", "id": 123} for sales
+  //          {"type": "restock", "supplier": "ABC Supplies"} for restocks
+
+  // ==========================================================================
+  // Audit Information
+  // ==========================================================================
+
+  // Who made this change? (Admin user)
+  changedById   Int    @map("changed_by_id")
+  changedBy     User   @relation(fields: [changedById], references: [id])
+
+  // When did this change occur?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // ==========================================================================
+  // Model Configuration
+  // ==========================================================================
+  @@map("inventory_logs")
+
+  // Indexes for common queries
+  @@index([productId])      // Get history for a specific product
+  @@index([changeType])     // Filter by change type
+  @@index([createdAt])      // Sort by date
+  @@index([changedById])    // Find changes by specific admin
 }
 
 // =============================================================================

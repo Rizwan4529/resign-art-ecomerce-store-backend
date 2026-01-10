@@ -148,21 +148,41 @@ const updateStock = asyncHandler(async (req, res) => {
       }
   }
 
-  const updatedProduct = await prisma.product.update({
-    where: { id: productId },
-    data: { stock: newStock },
-    select: {
-      id: true,
-      name: true,
-      stock: true,
-      updatedAt: true,
-    },
+  // Update stock and log the change in a transaction
+  const result = await prisma.$transaction(async (tx) => {
+    const updatedProduct = await tx.product.update({
+      where: { id: productId },
+      data: { stock: newStock },
+      select: {
+        id: true,
+        name: true,
+        stock: true,
+        updatedAt: true,
+      },
+    });
+
+    // Create inventory log entry if user is authenticated
+    if (req.user && req.user.id) {
+      await tx.inventoryLog.create({
+        data: {
+          productId: productId,
+          previousStock: product.stock,
+          newStock: newStock,
+          changeAmount: newStock - product.stock,
+          changeType: 'MANUAL_ADJUSTMENT',
+          reason: `Stock ${operation} operation`,
+          changedById: req.user.id,
+        },
+      });
+    }
+
+    return updatedProduct;
   });
 
   res.status(200).json({
     success: true,
     message: `Stock updated successfully. New stock: ${newStock} (SRS-83)`,
-    data: updatedProduct,
+    data: result,
   });
 });
 
