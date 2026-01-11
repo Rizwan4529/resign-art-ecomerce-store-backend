@@ -396,6 +396,62 @@ const updateProfile = asyncHandler(async (req, res) => {
 });
 
 // =============================================================================
+// @desc    Upload profile picture
+// @route   POST /api/auth/profile/picture
+// @access  Private
+// =============================================================================
+//
+// Upload profile picture for authenticated user
+// - Uses multer middleware to handle file upload
+// - Stores image in uploads/profiles/ directory
+// - Updates user's profileImage field in database
+
+const uploadProfilePicture = asyncHandler(async (req, res) => {
+  // ---------------------------------------------------------------------------
+  // Validate file upload
+  // ---------------------------------------------------------------------------
+
+  if (!req.file) {
+    res.status(400);
+    throw new Error('Please upload a profile picture');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build the profile image URL path
+  // ---------------------------------------------------------------------------
+
+  const profileImagePath = `/uploads/profiles/${req.file.filename}`;
+
+  // ---------------------------------------------------------------------------
+  // Update user's profileImage in database
+  // ---------------------------------------------------------------------------
+
+  const updatedUser = await prisma.user.update({
+    where: { id: req.user.id },
+    data: { profileImage: profileImagePath },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      address: true,
+      dateOfBirth: true,
+      role: true,
+      status: true,
+      profileImage: true,
+      createdAt: true,
+      updatedAt: true,
+    }
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Profile picture uploaded successfully',
+    data: { user: updatedUser }
+  });
+});
+
+// =============================================================================
 // @desc    Change password (when logged in)
 // @route   PUT /api/auth/change-password
 // @access  Private
@@ -710,6 +766,79 @@ const logout = asyncHandler(async (req, res) => {
 });
 
 // =============================================================================
+// @desc    Delete own account
+// @route   DELETE /api/auth/account
+// @access  Private
+// =============================================================================
+//
+// Allows users to delete their own account.
+// HARD DELETE - Permanently removes user and ALL related data including orders.
+//
+const deleteOwnAccount = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  // HARD DELETE - Remove everything
+  // Delete all related data first to maintain referential integrity
+  await prisma.$transaction([
+    // Delete order tracking history
+    prisma.orderTracking.deleteMany({
+      where: { order: { userId } },
+    }),
+    // Delete order items
+    prisma.orderItem.deleteMany({
+      where: { order: { userId } },
+    }),
+    // Delete payments
+    prisma.payment.deleteMany({
+      where: { order: { userId } },
+    }),
+    // Delete deliveries
+    prisma.delivery.deleteMany({
+      where: { order: { userId } },
+    }),
+    // Delete orders
+    prisma.order.deleteMany({
+      where: { userId },
+    }),
+    // Delete reviews
+    prisma.review.deleteMany({
+      where: { userId },
+    }),
+    // Delete notifications
+    prisma.notification.deleteMany({
+      where: { userId },
+    }),
+    // Delete cart items
+    prisma.cartItem.deleteMany({
+      where: { cart: { userId } },
+    }),
+    // Delete cart
+    prisma.cart.deleteMany({
+      where: { userId },
+    }),
+    // Finally, delete user
+    prisma.user.delete({
+      where: { id: userId },
+    }),
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: 'Account and all associated data deleted permanently',
+  });
+});
+
+// =============================================================================
 // EXPORTS
 // =============================================================================
 
@@ -718,10 +847,12 @@ module.exports = {
   login,
   getMe,
   updateProfile,
+  uploadProfilePicture,
   changePassword,
   forgotPassword,
   resetPassword,
   logout,
+  deleteOwnAccount,
 };
 
 // =============================================================================

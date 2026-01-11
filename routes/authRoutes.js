@@ -16,14 +16,17 @@ const {
   login,
   getMe,
   updateProfile,
+  uploadProfilePicture,
   changePassword,
   forgotPassword,
   resetPassword,
   logout,
+  deleteOwnAccount,
 } = require('../controllers/authController');
 
 // Import middleware
 const { protect } = require('../middleware/authMiddleware');
+const { uploadProfilePicture: uploadMiddleware } = require('../middleware/uploadMiddleware');
 
 // =============================================================================
 // PUBLIC ROUTES - No authentication required
@@ -63,6 +66,11 @@ router.get('/me', protect, getMe);
 // @access  Private
 router.put('/profile', protect, updateProfile);
 
+// @route   POST /api/auth/profile/picture
+// @desc    Upload profile picture
+// @access  Private
+router.post('/profile/picture', protect, uploadMiddleware, uploadProfilePicture);
+
 // @route   PUT /api/auth/change-password
 // @desc    Change password (when logged in)
 // @access  Private
@@ -72,5 +80,10 @@ router.put('/change-password', protect, changePassword);
 // @desc    Logout user
 // @access  Private
 router.post('/logout', protect, logout);
+
+// @route   DELETE /api/auth/account
+// @desc    Delete own account
+// @access  Private
+router.delete('/account', protect, deleteOwnAccount);
 
 module.exports = router;
