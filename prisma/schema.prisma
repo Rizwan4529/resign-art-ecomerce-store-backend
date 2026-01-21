@@ -1171,6 +1171,33 @@ model UserPreference {
 }
 
 // =============================================================================
+// CONTACT FORM SUBMISSIONS MODEL
+// =============================================================================
+// Stores contact form submissions from website visitors
+// Admin can view all submissions and respond to inquiries
+
+model ContactSubmission {
+  id          Int      @id @default(autoincrement())
+  
+  // Visitor information
+  name        String   @db.VarChar(255)
+  email       String   @db.VarChar(255)
+  phone       String?  @db.VarChar(20)
+  
+  // Inquiry details
+  inquiryType String   @db.VarChar(100)
+  subject     String   @db.VarChar(255)
+  message     String   @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("contact_submissions")
+  @@index([createdAt])
+  @@index([email])
+}
+
+// =============================================================================
 // CHAT MESSAGE MODEL
 // =============================================================================
 // Based on Section 5.12.3 (Live Chat)
