@@ -462,8 +462,8 @@ const getDashboardSummary = asyncHandler(async (req, res) => {
     prisma.order.count({ where: { status: 'PENDING' } }),
     prisma.order.aggregate({
       where: {
-        status: 'DELIVERED',
-        deliveredAt: { gte: startOfMonth },
+        status: { not: 'CANCELLED' },
+        orderedAt: { gte: startOfMonth },
       },
       _sum: { totalAmount: true },
     }),

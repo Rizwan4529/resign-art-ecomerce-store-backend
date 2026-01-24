@@ -132,8 +132,9 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 
   // Calculate final total (could add shipping, tax, discounts here)
-  const shippingCost = subtotal >= 5000 ? 0 : 200; // Free shipping over 5000
-  const taxAmount = 0; // No tax for now
+  const shippingCost = 500;
+  const taxRate = 0.08;
+  const taxAmount = subtotal * taxRate;
   const totalAmount = subtotal + shippingCost + taxAmount;
 
   // ---------------------------------------------------------------------------
@@ -664,7 +665,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
       CONFIRMED: "Your order has been confirmed and is being prepared.",
       PROCESSING: "Your order is now being processed.",
       SHIPPED: trackingNumber
-        ? `Your order has been shipped! Tracking number: ${trackingNumber}`
+        ? `Your order has been shipped! Tracking number: ${trackingNumber}, Courier Company: ${courierCompany}`
         : "Your order has been shipped!",
       DELIVERED:
         "Your order has been delivered. Thank you for shopping with us!",
