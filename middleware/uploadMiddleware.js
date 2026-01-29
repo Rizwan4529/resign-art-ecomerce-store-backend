@@ -27,8 +27,28 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter - only allow images
-const fileFilter = (req, file, cb) => {
+// File filter - allow images and videos for products
+const mediaFileFilter = (req, file, cb) => {
+  const allowedImageTypes = /jpeg|jpg|png|gif|webp/;
+  const allowedVideoTypes = /mp4|webm|mov|avi|quicktime/;
+  const allowedMimeTypes = [
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo', 'video/avi'
+  ];
+
+  const ext = path.extname(file.originalname).toLowerCase().slice(1);
+  const isValidExt = allowedImageTypes.test(ext) || allowedVideoTypes.test(ext);
+  const isValidMime = allowedMimeTypes.includes(file.mimetype);
+
+  if (isValidMime && isValidExt) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Only image files (jpeg, jpg, png, gif, webp) and video files (mp4, webm, mov, avi) are allowed'));
+  }
+};
+
+// File filter - only allow images (for profile pictures)
+const imageOnlyFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
@@ -54,22 +74,22 @@ const profileStorage = multer.diskStorage({
   }
 });
 
-// Configure multer for products
+// Configure multer for products (images and videos)
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: 50 * 1024 * 1024, // 50MB max file size (for videos)
   },
-  fileFilter: fileFilter,
+  fileFilter: mediaFileFilter,
 });
 
-// Configure multer for profile pictures
+// Configure multer for profile pictures (images only)
 const profileUpload = multer({
   storage: profileStorage,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB max file size
   },
-  fileFilter: fileFilter,
+  fileFilter: imageOnlyFilter,
 });
 
 module.exports = {
